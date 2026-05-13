@@ -1,10 +1,11 @@
 plugins { id 'com.android.application' }
 android {
-    compileSdkVersion 34
+    namespace "com.darkwaters.sentinel"
+    compileSdk 34
     defaultConfig {
         applicationId "com.darkwaters.sentinel"
-        minSdkVersion 21
-        targetSdkVersion 34
+        minSdk 21
+        targetSdk 34
         versionCode 1
         versionName "1.0"
     }
