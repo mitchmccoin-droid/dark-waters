@@ -13,4 +13,4 @@ android {
     aaptOptions { noCompress "html","js","css","png","jpg","webp" }
     packagingOptions { doNotStrip "**/*.html" }
 }
-dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
+dependencies {}
