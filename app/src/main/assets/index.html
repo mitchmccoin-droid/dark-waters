@@ -98,6 +98,55 @@
 
 })();
 </script>
+
+<script>
+/* DW MutationObserver fallback — convert data: URIs in backgroundImage to blob: URLs */
+(function(){
+  var _bc={};
+  function toBlob(uri){
+    if(_bc[uri])return _bc[uri];
+    try{
+      var c=uri.indexOf(','),m=uri.substring(5,c).split(';')[0];
+      var b=atob(uri.substring(c+1)),u=new Uint8Array(b.length);
+      for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+      var url=URL.createObjectURL(new Blob([u],{type:m}));
+      _bc[uri]=url;return url;
+    }catch(e){return null;}
+  }
+  function fixEl(el){
+    if(!el)return;
+    var bi=el.style.backgroundImage||'';
+    if(bi.indexOf('data:')!==-1){
+      var uri=bi.replace(/^url\(['"]?/,'').replace(/['"]?\)$/,'');
+      if(uri.startsWith('data:')){
+        var b=toBlob(uri);
+        if(b){el.style.backgroundImage='url('+b+')';}
+      }
+    }
+  }
+  function watchEl(el){
+    if(!el)return;
+    fixEl(el);
+    new MutationObserver(function(ms){
+      ms.forEach(function(m){if(m.type==='attributes')fixEl(m.target);});
+    }).observe(el,{attributes:true,attributeFilter:['style']});
+  }
+  function init(){
+    watchEl(document.getElementById('room-bg'));
+    watchEl(document.getElementById('portrait-room-bg'));
+    /* Also run a one-shot scan 1s and 3s after page load */
+    [1000,3000].forEach(function(t){
+      setTimeout(function(){
+        document.querySelectorAll('[style*="data:"]').forEach(fixEl);
+      },t);
+    });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',init);
+  }else{init();}
+})();
+</script>
+
 <script>
 (function(){
 /* localStorage polyfill */
@@ -133,9 +182,14 @@ if(pe){pe.style.backgroundImage='url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 })();
 </script><style>#btn-left,#btn-right{display:none!important;}</style>
 <style>
-#mobile-controls{justify-content:flex-end!important;}
+#mobile-controls{justify-content:space-between;}
 #action-btns{flex-direction:row!important;gap:14px!important;}
 .act-btn{width:68px!important;height:68px!important;font-size:10px!important;}
+</style>
+<style>
+#mobile-controls{display:flex;flex-direction:row;justify-content:space-between!important;align-items:flex-end;width:100%;pointer-events:none;}
+#joy-wrap{pointer-events:auto;order:0;}
+#action-btns{pointer-events:auto;order:1;flex-direction:row;gap:12px;align-items:flex-end;}
 </style>
 </head>
 <body>
