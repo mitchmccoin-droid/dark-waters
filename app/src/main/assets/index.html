@@ -24,7 +24,58 @@
 .sar-grid-overlay{top:0!important;right:0!important;bottom:0!important;left:0!important}
 #promotion-bg{top:0!important;right:0!important;bottom:0!important;left:0!important}
 .rotate-prompt{top:0!important;right:0!important;bottom:0!important;left:0!important}
-</style><script>
+</style>
+<script>
+/* DW BlobURL patch — convert data: URIs in backgroundImage to blob: URLs.
+   Android Chrome limits CSS data-URI size (~128KB). Blob URLs have no limit. */
+(function(){
+  var _cache = {};
+  function toBlob(dataURI){
+    if(_cache[dataURI]) return _cache[dataURI];
+    try{
+      var comma = dataURI.indexOf(',');
+      var meta  = dataURI.substring(5, comma);  // e.g. "image/jpeg;base64"
+      var mime  = meta.split(';')[0];
+      var b64   = dataURI.substring(comma+1);
+      var bin   = atob(b64);
+      var buf   = new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([buf],{type:mime}));
+      _cache[dataURI] = url;
+      return url;
+    }catch(e){ return null; }
+  }
+  function patchVal(val){
+    if(!val || val.indexOf('data:') === -1) return val;
+    return val.replace(/url\(['"]?(data:[^'"\)\s]+)['"]?\)/g, function(_,uri){
+      var b = toBlob(uri);
+      return b ? 'url('+b+')' : _;
+    });
+  }
+  /* Patch CSSStyleDeclaration.backgroundImage setter */
+  var desc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype,'backgroundImage');
+  if(desc && desc.set){
+    Object.defineProperty(CSSStyleDeclaration.prototype,'backgroundImage',{
+      set: function(v){ desc.set.call(this, patchVal(v)); },
+      get: desc.get, configurable:true
+    });
+  }
+  /* Also patch img.src for portrait images */
+  var sdesc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');
+  if(sdesc && sdesc.set){
+    Object.defineProperty(HTMLImageElement.prototype,'src',{
+      set: function(v){
+        if(v && v.startsWith('data:')){
+          var b=toBlob(v); if(b) v=b;
+        }
+        sdesc.set.call(this,v);
+      },
+      get: sdesc.get, configurable:true
+    });
+  }
+})();
+</script>
+<script>
 (function(){
 /* localStorage polyfill */
 try{localStorage.setItem('_t','1');localStorage.removeItem('_t')}catch(e){
@@ -731,7 +782,7 @@ if(pe){pe.style.backgroundImage='url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   <div id="action-btns">
     <button class="act-btn" id="btn-fire2">🔫<br><span>FIRE</span></button>
     <button class="act-btn" id="btn-interact2">⚙<br><span>ACT</span></button>
-    <button class="act-btn" id="btn-map2">⚓<br><span>MAP</span></button>
+    
   </div>
 </div>
 
@@ -761,7 +812,7 @@ if(pe){pe.style.backgroundImage='url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
 }
 #joy-hint{font-family:"Share Tech Mono",monospace;font-size:8px;color:rgba(77,184,184,0.5);letter-spacing:1px;}
-#action-btns{display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;}
+#action-btns{display:flex;flex-direction:row;gap:8px;align-items:flex-end;pointer-events:none;}
 .act-btn{
   width:58px;height:58px;border-radius:50%;border:2px solid;
   font-size:9px;font-family:"Share Tech Mono",monospace;font-weight:bold;cursor:pointer;
