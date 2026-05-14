@@ -73,6 +73,29 @@
       get: sdesc.get, configurable:true
     });
   }
+
+  /* ── VIRTUAL JOYSTICK ── */
+  var jb=document.getElementById('joy-base'),jk=document.getElementById('joy-knob');
+  var jid=null,MAX_R=28,THRESH=18,_jcd=null;
+  function jCenter(){jk.style.transform='translate(-50%,-50%)';jk.style.transition='transform 0.15s';}
+  function jApply(cx,cy){
+    var r=jb.getBoundingClientRect();
+    var dx=cx-(r.left+r.width/2),dy=cy-(r.top+r.height/2);
+    var d=Math.sqrt(dx*dx+dy*dy);
+    if(d>MAX_R){dx=dx/d*MAX_R;dy=dy/d*MAX_R;}
+    jk.style.transition='none';
+    jk.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+    var bl=document.getElementById('btn-left'),br=document.getElementById('btn-right');
+    clearTimeout(_jcd);
+    if(dx < -THRESH){_jcd=setTimeout(function(){if(bl)bl.click();},80);}
+    else if(dx > THRESH){_jcd=setTimeout(function(){if(br)br.click();},80);}
+  }
+  if(jb){
+    jb.addEventListener('touchstart',function(e){e.preventDefault();var t=e.changedTouches[0];jid=t.identifier;jApply(t.clientX,t.clientY);},{passive:false});
+    jb.addEventListener('touchmove',function(e){e.preventDefault();for(var i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===jid){jApply(e.changedTouches[i].clientX,e.changedTouches[i].clientY);break;}}},{passive:false});
+    jb.addEventListener('touchend',function(e){jid=null;jCenter();},{passive:false});
+  }
+
 })();
 </script>
 <script>
@@ -781,6 +804,10 @@ if(pe){pe.style.backgroundImage='url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 <div id="mobile-controls">
   <!-- Left: virtual joystick -->
   <!-- Right:<!-- Right: action buttons -->
+    <div id="joy-wrap">
+    <div id="joy-base"><div id="joy-knob"></div></div>
+    <div id="joy-hint">NAVIGATE</div>
+  </div>
   <div id="action-btns">
     <button class="act-btn" id="btn-fire2">🔫<br><span>FIRE</span></button>
     <button class="act-btn" id="btn-interact2">⚙<br><span>ACT</span></button>
