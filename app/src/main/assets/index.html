@@ -818,9 +818,12 @@ var PORTRAIT_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAwAAAAVgCAIAAA
 var _portObs = null;
 
 /* -- PORTRAIT ------------------------------------------------------------ */
-function applyPortrait() {
+function applyPortrait(attempt) {
   var el = document.getElementById('title-portrait');
-  if (!el) return;
+  if (!el) {
+    if ((attempt||0) < 15) setTimeout(function(){ applyPortrait((attempt||0)+1); }, 300);
+    return;
+  }
   el.style.backgroundImage = 'none';
   var img = document.getElementById('dw-portrait-img');
   if (!img) {
@@ -841,32 +844,47 @@ function applyPortrait() {
   }
 }
 
-/* -- ROOM BACKGROUND → <img> --------------------------------------------- */
-function handleRoomBg(el) {
+/* -- ROOM BACKGROUND: override pj() globally to render via <img> ---------- */
+/* pj() is a global function (declared at script top-level) that sets        */
+/* room-bg.style.backgroundImage. We wrap it to use <img> instead.          */
+function _dwSetRoomBgImg(uri) {
+  var el = document.getElementById('room-bg');
   if (!el) return;
-  var bi = el.style.backgroundImage;
-  if (!bi || bi === 'none') return;
-  var uri = bi.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
-  if (!uri || uri.length < 10) return;
   var img = document.getElementById('room-bg-img');
   if (!img) {
     img = document.createElement('img');
     img.id = 'room-bg-img';
-    img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center bottom;display:block;pointer-events:none;';
+    img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center bottom;pointer-events:none;display:none;';
     el.insertBefore(img, el.firstChild);
   }
-  if (img.getAttribute('src') !== uri) img.src = uri;
-  img.style.display = 'block';
+  if (img.getAttribute('src') !== uri) {
+    img.style.display = 'none';
+    img.src = uri;
+    img.onload = function() { img.style.display = 'block'; };
+    // Also support already-cached images
+    if (img.complete && img.naturalWidth) img.style.display = 'block';
+  } else {
+    img.style.display = 'block';
+  }
   el.style.backgroundImage = 'none';
 }
-
-function setupRoomBgObserver() {
-  var el = document.getElementById('room-bg');
-  if (!el) { setTimeout(setupRoomBgObserver, 200); return; }
-  handleRoomBg(el);
-  new MutationObserver(function() { handleRoomBg(document.getElementById('room-bg')); })
-    .observe(el, {attributes:true, attributeFilter:['style']});
+function _dwOverridePj() {
+  if (typeof window.pj !== 'function') { setTimeout(_dwOverridePj, 100); return; }
+  var _orig = window.pj;
+  window.pj = function(A) {
+    _orig(A);
+    var el = document.getElementById('room-bg');
+    if (!el) return;
+    var bi = el.style.backgroundImage;
+    if (bi && bi !== 'none') {
+      var uri = bi.replace(/^url\(["']?/,'').replace(/["']?\)$/,'');
+      if (uri && uri.length > 20) _dwSetRoomBgImg(uri);
+    }
+  };
 }
+// Override pj immediately (not inside init) so it is ready before any user tap
+_dwOverridePj();
+function setupRoomBgObserver() { /* kept for compat but pj override handles it */ }
 
 /* -- SPRITE --------------------------------------------------------------- */
 var _sc=null,_sCtx=null,_sSheet=null,_sSrc='',_sBP='0px 0px',_sFlip=false;
@@ -956,8 +974,9 @@ function watchGameScreen() {
 
 /* -- INIT ---------------------------------------------------------------- */
 function init() {
-  setTimeout(applyPortrait, 60);
-  setupRoomBgObserver();
+  // Portrait: 500ms gives game time to fully set up, retry 10x if element not ready
+  setTimeout(function() { applyPortrait(0); }, 500);
+  // setupRoomBgObserver() - handled by _dwOverridePj() called above
   setupSprite();
   setupJoystick();
   setupActionBtns();
