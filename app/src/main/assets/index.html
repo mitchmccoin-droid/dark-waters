@@ -58,28 +58,55 @@ if(pe){pe.style.backgroundImage='url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 });
 })();
 </script><style>
-#title-screen{height:100vh!important;min-height:100vh!important;display:flex!important;}
-#btn-left,#btn-right{display:none!important;}
-#btn-vessel-map{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer;}
-#mobile-controls{display:none;}
+/* title-screen: full viewport height only — game controls display via .active class */
+#title-screen { height:100vh !important; min-height:100vh !important; }
+/* hide the original left/right nav buttons — joystick handles navigation */
+#btn-left, #btn-right { display:none !important; }
+/* MAP button: touch-friendly */
+#btn-vessel-map { touch-action:manipulation; -webkit-tap-highlight-color:transparent; cursor:pointer; }
+/* Mobile controls: start hidden, JS shows when game screen is active */
+#mobile-controls { display:none; }
 </style>
 <style>
-#mobile-controls{position:fixed;bottom:0;left:0;right:0;
-  flex-direction:row;justify-content:space-between;align-items:flex-end;
-  padding:0 10px 10px;box-sizing:border-box;pointer-events:none;z-index:9999;}
-#joy-wrap{display:flex;flex-direction:column;align-items:center;pointer-events:auto;}
-#joy-base{width:82px;height:82px;border-radius:50%;background:rgba(0,200,180,0.15);
-  border:2px solid rgba(0,200,180,0.5);position:relative;touch-action:none;pointer-events:auto;}
-#joy-knob{width:36px;height:36px;border-radius:50%;background:#00e5cc;position:absolute;
-  top:50%;left:50%;transform:translate(-50%,-50%);transition:transform 0.12s;
-  box-shadow:0 0 8px rgba(0,229,204,0.7);pointer-events:none;}
-#joy-hint{color:rgba(0,200,180,0.55);font-size:9px;letter-spacing:.1em;margin-top:4px;font-family:monospace;}
-#action-btns{display:flex;flex-direction:row;gap:12px;align-items:flex-end;pointer-events:auto;}
-.act-btn{width:64px;height:64px;border-radius:50%;border:2px solid;font-size:9px;font-family:monospace;
-  color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  cursor:pointer;touch-action:manipulation;pointer-events:auto;-webkit-tap-highlight-color:transparent;}
-#btn-fire2{background:rgba(180,40,40,0.85);border-color:#c0392b;}
-#btn-interact2{background:rgba(0,120,110,0.85);border-color:#00897b;}
+/* Mobile controls layout */
+#mobile-controls {
+  position:fixed; bottom:0; left:0; right:0;
+  flex-direction:row; justify-content:space-between; align-items:flex-end;
+  padding:0 10px 10px; box-sizing:border-box; pointer-events:none; z-index:9999;
+}
+#joy-wrap { display:flex; flex-direction:column; align-items:center; pointer-events:auto; }
+#joy-base {
+  width:82px; height:82px; border-radius:50%;
+  background:rgba(0,200,180,0.15); border:2px solid rgba(0,200,180,0.5);
+  position:relative; touch-action:none; pointer-events:auto;
+}
+#joy-knob {
+  width:36px; height:36px; border-radius:50%; background:#00e5cc;
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  box-shadow:0 0 8px rgba(0,229,204,0.7); pointer-events:none;
+}
+#joy-hint { color:rgba(0,200,180,0.55); font-size:9px; letter-spacing:.1em; margin-top:4px; font-family:monospace; }
+#action-btns { display:flex; flex-direction:row; gap:12px; align-items:flex-end; pointer-events:auto; }
+.act-btn {
+  width:64px; height:64px; border-radius:50%; border:2px solid;
+  font-size:9px; font-family:monospace; color:#fff;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  cursor:pointer; touch-action:manipulation; pointer-events:auto; -webkit-tap-highlight-color:transparent;
+}
+#btn-fire2  { background:rgba(180,40,40,0.85); border-color:#c0392b; }
+#btn-interact2 { background:rgba(0,120,110,0.85); border-color:#00897b; }
+/* Map grid styling (fallback renderer) */
+.map-deck { margin-bottom:12px; }
+.map-deck-label { color:rgba(0,200,180,0.6); font-size:10px; letter-spacing:.12em; margin-bottom:6px; font-family:monospace; }
+.map-rooms-row { display:flex; flex-wrap:wrap; gap:6px; }
+.map-room-btn {
+  padding:6px 12px; border:1px solid rgba(0,200,180,0.4); border-radius:4px;
+  background:rgba(0,50,60,0.7); color:rgba(0,200,180,0.9);
+  font-size:11px; font-family:monospace; letter-spacing:.08em; cursor:pointer;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+}
+.map-room-btn.current { border-color:#00e5cc; background:rgba(0,100,100,0.6); color:#00e5cc; }
+.map-room-btn.available:active { background:rgba(0,80,80,0.8); }
 </style>
 </head>
 <body>
@@ -748,34 +775,33 @@ if(pe){pe.style.backgroundImage='url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 <script>
 (function(){'use strict';
 
-// ── IMAGE PRELOAD: XHR -> FileReader -> data:URL ──────────────────
-var imgCache={},imgWaiters={};
+/* ── IMAGE PRELOAD: XHR → FileReader → data:URL ─────────────────── */
+var C={},W={};
 function preload(src,cb){
   if(!src||src==='none')return cb&&cb(null);
-  var v=imgCache[src];
+  var v=C[src];
   if(v&&v!=='loading'){cb&&cb(v==='error'?null:v);return;}
-  if(v==='loading'){(imgWaiters[src]=imgWaiters[src]||[]).push(cb);return;}
-  imgCache[src]='loading';imgWaiters[src]=cb?[cb]:[];
-  var xhr=new XMLHttpRequest();
-  xhr.open('GET',src,true);xhr.responseType='blob';
-  xhr.onload=function(){
-    var b=xhr.response;
-    if(!b||b.size===0){done(src,null);return;}
-    var fr=new FileReader();
-    fr.onload=function(){done(src,fr.result);};
-    fr.onerror=function(){done(src,null);};
-    fr.readAsDataURL(b);
+  if(v==='loading'){(W[src]=W[src]||[]).push(cb);return;}
+  C[src]='loading';W[src]=cb?[cb]:[];
+  var x=new XMLHttpRequest();
+  x.open('GET',src,true);x.responseType='blob';
+  x.onload=function(){
+    var b=x.response;if(!b||b.size===0){done(src,null);return;}
+    var r=new FileReader();
+    r.onload=function(){done(src,r.result);};
+    r.onerror=function(){done(src,null);};
+    r.readAsDataURL(b);
   };
-  xhr.onerror=function(){done(src,null);};
-  xhr.send();
+  x.onerror=function(){done(src,null);};
+  x.send();
 }
 function done(src,url){
-  imgCache[src]=url||'error';
-  var ws=imgWaiters[src]||[];delete imgWaiters[src];
+  C[src]=url||'error';
+  var ws=W[src]||[];delete W[src];
   ws.forEach(function(f){f&&f(url);});
 }
 
-// ── ROOM BG ───────────────────────────────────────────────────────
+/* ── ROOM BG: CSS bg-image → <img> ─────────────────────────────── */
 var rbImg=null,rbLast='';
 function setupRoomBg(){
   var el=document.getElementById('room-bg');if(!el)return;
@@ -790,15 +816,14 @@ function pollRoomBg(){
     var m=bi.match(/url\(['"]?(file:\/\/[^'")\s]+)['"]?\)/);
     var src=m?m[1]:null;
     if(src&&src!==rbLast){
-      rbLast=src;rbImg.style.display='none';
-      el.style.backgroundImage='none';
+      rbLast=src;rbImg.style.display='none';el.style.backgroundImage='none';
       preload(src,function(d){if(d){rbImg.src=d;rbImg.style.display='block';}});
     }else if(!src&&rbLast){rbLast='';rbImg.style.display='none';}
   }
   setTimeout(pollRoomBg,150);
 }
 
-// ── PORTRAIT BG ───────────────────────────────────────────────────
+/* ── PORTRAIT BG ─────────────────────────────────────────────────── */
 var pbImg=null,pbLast='';
 function setupPortBg(){
   var el=document.getElementById('portrait-room-bg');if(!el)return;
@@ -820,7 +845,28 @@ function pollPortBg(){
   setTimeout(pollPortBg,150);
 }
 
-// ── SPRITE CANVAS ─────────────────────────────────────────────────
+/* ── TITLE PORTRAIT: BA is a data URI already — poll & set ─────── */
+var tpDone=false;
+function pollTitlePortrait(){
+  if(tpDone)return;
+  var el=document.getElementById('title-portrait');
+  if(el){
+    var bi=el.style.backgroundImage||'';
+    /* If BA is a file:// URL that didn't resolve, preload it */
+    var m=bi.match(/url\(['"]?(file:\/\/[^'")\s]+)['"]?\)/);
+    if(m){
+      tpDone=true;
+      var src=m[1];el.style.backgroundImage='none';
+      preload(src,function(d){if(d)el.style.backgroundImage='url('+d+')';});
+      return;
+    }
+    /* If already a data URI, leave it alone — it renders fine */
+    if(bi&&bi.indexOf('data:')!==-1){tpDone=true;return;}
+  }
+  setTimeout(pollTitlePortrait,200);
+}
+
+/* ── SPRITE CANVAS ───────────────────────────────────────────────── */
 var sc=null,sCtx=null,sSheet=null,sSrc='',sBP='';
 var SW=90,SH=90;
 function setupSprite(){
@@ -829,16 +875,14 @@ function setupSprite(){
   sc.width=SW;sc.height=SH;
   sc.style.cssText='position:absolute;top:0;left:0;width:'+SW+'px;height:'+SH+'px;';
   el.parentNode.insertBefore(sc,el);
-  sCtx=sc.getContext('2d');
-  el.style.visibility='hidden';
+  sCtx=sc.getContext('2d');el.style.visibility='hidden';
 }
 function drawSpr(sheet,bp,flip){
   if(!sCtx||!sheet)return;
   var p=bp.match(/(-?\d+)px\s+(-?\d+)px/);if(!p)return;
-  var sx=-parseInt(p[1]),sy=-parseInt(p[2]);
   sCtx.clearRect(0,0,SW,SH);sCtx.save();
   if(flip){sCtx.translate(SW,0);sCtx.scale(-1,1);}
-  sCtx.drawImage(sheet,sx,sy,SW,SH,0,0,SW,SH);
+  sCtx.drawImage(sheet,-parseInt(p[1]),-parseInt(p[2]),SW,SH,0,0,SW,SH);
   sCtx.restore();
 }
 function pollSprite(){
@@ -853,8 +897,7 @@ function pollSprite(){
       sSrc=src;sSheet=null;el.style.backgroundImage='none';
       (function(s){preload(s,function(d){
         if(!d)return;var i=new Image();
-        i.onload=function(){if(s===sSrc){sSheet=i;drawSpr(sSheet,sBP,flip);}};
-        i.src=d;
+        i.onload=function(){if(s===sSrc){sSheet=i;drawSpr(sSheet,sBP,flip);}};i.src=d;
       });})(src);
     }
     if(bp!==sBP){sBP=bp;drawSpr(sSheet,sBP,flip);}
@@ -862,10 +905,11 @@ function pollSprite(){
   setTimeout(pollSprite,80);
 }
 
-// ── MAP ───────────────────────────────────────────────────────────
+/* ── MAP ─────────────────────────────────────────────────────────── */
 function populateMapGrid(){
   var grid=document.getElementById('vessel-map-grid');if(!grid)return;
   try{if(typeof Vj==='function'){Vj();return;}}catch(e){}
+  /* Fallback hardcoded renderer */
   var decks=[
     {label:'Weather Deck',names:['BOW','FLIGHT DECK','FANTAIL'],ids:['bow','flight_deck','fantail']},
     {label:'Bridge (04)',names:['CO OFFICE','XO OFFICE','BRIDGE/CIC'],ids:['co_office','xo_office','bridge_cic']},
@@ -874,11 +918,10 @@ function populateMapGrid(){
     {label:'Below Main (01)',names:['ENGINE ROOM','RANGE'],ids:['engine_room','shooting_range']}
   ];
   grid.innerHTML='';
-  var cur=(typeof F!=='undefined')?F:'';
+  var cur='';try{cur=(typeof F!=='undefined')?F:'';}catch(e){}
   decks.forEach(function(d){
     var dd=document.createElement('div');dd.className='map-deck';
-    var dl=document.createElement('div');dl.className='map-deck-label';dl.textContent=d.label;
-    dd.appendChild(dl);
+    var dl=document.createElement('div');dl.className='map-deck-label';dl.textContent=d.label;dd.appendChild(dl);
     var row=document.createElement('div');row.className='map-rooms-row';
     d.ids.forEach(function(id,i){
       var btn=document.createElement('button');btn.className='map-room-btn';btn.textContent=d.names[i];
@@ -886,18 +929,17 @@ function populateMapGrid(){
       if(isCur){btn.classList.add('current');}
       else{
         btn.classList.add('available');
-        function makeNav(rid){
-          btn.addEventListener('click',function(){
-            document.getElementById('vessel-map-overlay').classList.add('hidden');
-            setTimeout(function(){try{if(typeof L==='function')L(rid);}catch(e){}},200);
-          });
+        (function(rid){
           btn.addEventListener('touchend',function(e){
             e.preventDefault();
-            document.getElementById('vessel-map-overlay').classList.add('hidden');
+            var ov=document.getElementById('vessel-map-overlay');if(ov)ov.classList.add('hidden');
             setTimeout(function(){try{if(typeof L==='function')L(rid);}catch(e){}},200);
           },{passive:false});
-        }
-        makeNav(id);
+          btn.addEventListener('click',function(){
+            var ov=document.getElementById('vessel-map-overlay');if(ov)ov.classList.add('hidden');
+            setTimeout(function(){try{if(typeof L==='function')L(rid);}catch(e){}},200);
+          });
+        })(id);
       }
       row.appendChild(btn);
     });
@@ -918,7 +960,7 @@ function setupMap(){
   if(ov)ov.addEventListener('touchend',function(e){if(e.target===ov)ov.classList.add('hidden');},{passive:false});
 }
 
-// ── JOYSTICK ─────────────────────────────────────────────────────
+/* ── JOYSTICK ─────────────────────────────────────────────────────── */
 function setupJoy(){
   var jb=document.getElementById('joy-base'),jk=document.getElementById('joy-knob');
   if(!jb||!jk)return;
@@ -927,8 +969,7 @@ function setupJoy(){
   function mov(cx,cy){
     var r=jb.getBoundingClientRect(),dx=cx-(r.left+r.width/2),dy=cy-(r.top+r.height/2);
     var d=Math.sqrt(dx*dx+dy*dy);if(d>MAX_R){dx=dx/d*MAX_R;dy=dy/d*MAX_R;}
-    jk.style.transition='none';
-    jk.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+    jk.style.transition='none';jk.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
     clearTimeout(_jt);
     var bl=document.getElementById('btn-left'),br=document.getElementById('btn-right');
     if(dx<-THRESH)_jt=setTimeout(function(){bl&&bl.click();},80);
@@ -946,27 +987,28 @@ function setupJoy(){
   });
 }
 
-// ── SHOW CONTROLS ONLY ON GAME SCREEN ────────────────────────────
+/* ── SHOW CONTROLS ONLY WHEN GAME SCREEN IS ACTIVE ──────────────── */
 function watchGame(){
   var mc=document.getElementById('mobile-controls');
   var gs=document.getElementById('game-screen');
   if(!mc||!gs){setTimeout(watchGame,300);return;}
   function chk(){
-    var on=gs.classList.contains('active')||
-           (gs.style.display&&gs.style.display!=='none'&&gs.style.display!=='');
+    /* game-screen is active when it has class 'active' */
+    var on=gs.classList.contains('active');
     mc.style.display=on?'flex':'none';
   }
   new MutationObserver(chk).observe(gs,{attributes:true,attributeFilter:['class','style']});
-  var nc=document.getElementById('btn-new-career');
-  if(nc)nc.addEventListener('click',function(){setTimeout(function(){mc.style.display='flex';},600);});
+  /* Belt-and-suspenders: also poll every 500ms in case MutationObserver misses */
+  setInterval(chk,500);
   chk();
 }
 
-// ── INIT ─────────────────────────────────────────────────────────
+/* ── INIT ─────────────────────────────────────────────────────────── */
 function init(){
   setupRoomBg();setupPortBg();setupSprite();
   setupMap();setupJoy();watchGame();
   pollRoomBg();pollPortBg();pollSprite();
+  pollTitlePortrait();
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
 else{init();}
