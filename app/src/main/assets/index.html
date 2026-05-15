@@ -962,6 +962,22 @@ function init() {
   setupJoystick();
   setupActionBtns();
   watchGameScreen();
+  // MAP button: touchend fires game's own click handler immediately (no 300ms delay)
+  var _mb = document.getElementById('btn-vessel-map');
+  if (_mb) {
+    _mb.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      _mb.click(); // fires bj() -> shows overlay + Vj()
+    }, {passive:false});
+  }
+  // Close MAP button
+  var _cb = document.getElementById('close-vessel-map');
+  if (_cb) {
+    _cb.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      _cb.click();
+    }, {passive:false});
+  }
   var ts=document.getElementById('title-screen');
   if(ts) new MutationObserver(function(){setTimeout(applyPortrait,30);})
            .observe(ts,{attributes:true,attributeFilter:['class','style']});
