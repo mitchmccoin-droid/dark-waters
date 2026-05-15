@@ -180,7 +180,7 @@ document.getElementById('map-close').addEventListener('touchend', function(e){e.
     if(d>THRESH)go(dx); else clearTimeout(jTimer);
   }
   jb.addEventListener('touchstart',  function(e){e.preventDefault();var t=e.changedTouches[0];jId=t.identifier;move(t.clientX,t.clientY);},{passive:false});
-  jb.addEventListener('touchmove',   function(e){e.preventDefault();for(var i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===jId){move(e.changedTouches[i].clientX,e.changedTouches[i].clientY);break;},{passive:false});
+  jb.addEventListener('touchmove',   function(e){e.preventDefault();for(var i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===jId){move(e.changedTouches[i].clientX,e.changedTouches[i].clientY);break;}},{passive:false});
   jb.addEventListener('touchend',    function(e){e.preventDefault();jId=null;reset();},{passive:false});
   jb.addEventListener('touchcancel', function(e){e.preventDefault();jId=null;reset();},{passive:false});
   document.addEventListener('keydown',function(e){
